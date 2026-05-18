@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en" class="scroll-smooth touch-manipulation">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Unfollowers - IGUF</title>
+    <script>
+      (() => {
+        try {
+          const stored = localStorage.getItem("theme");
+          const systemDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+          const theme = stored === "dark" || (stored !== "light" && systemDark)
+            ? "dark"
+            : "light";
+          document.documentElement.classList.toggle("dark", theme === "dark");
+          document.documentElement.style.colorScheme = theme;
+          document.documentElement.style.backgroundColor =
+            theme === "dark" ? "oklch(0.145 0 0)" : "oklch(1 0 0)";
+        } catch {
+          // App runtime syncs theme after mount.
+        }
+      })();
+    </script>
+  </head>
+  <body>
+    <div id="app"></div>
+    <script type="module" src="./src/main.ts"></script>
+  </body>
+</html>

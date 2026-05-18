@@ -7,6 +7,12 @@ const backgrounds = {
 function setShellTheme(theme) {
   const background = theme === "dark" ? backgrounds.dark : backgrounds.light;
 
+  document.documentElement.style.transition =
+    "background-color 260ms cubic-bezier(0.16, 1, 0.3, 1)";
+  document.body.style.transition =
+    "background-color 260ms cubic-bezier(0.16, 1, 0.3, 1)";
+  frame.style.transition =
+    "background-color 260ms cubic-bezier(0.16, 1, 0.3, 1)";
   document.documentElement.style.backgroundColor = background;
   document.body.style.backgroundColor = background;
   document.documentElement.style.colorScheme = theme === "dark" ? "dark" : "light";
@@ -33,10 +39,6 @@ setShellTheme(
 document.body.append(frame);
 
 window.addEventListener("message", (event) => {
-  if (event.source !== frame.contentWindow) {
-    return;
-  }
-
   const data = event.data;
   if (
     data !== null &&

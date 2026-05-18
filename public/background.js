@@ -161,12 +161,25 @@ async function executeInstagramTask(tabId, func, arg) {
     throw new Error("Missing Instagram tab. Open Unfollowers from Instagram.");
   }
 
-  const [injectionResult] = await chrome.scripting.executeScript({
-    target: { tabId },
-    world: "MAIN",
-    func,
-    args: [arg],
-  });
+  let injectionResult;
+  for (let attempt = 0; attempt < 4; attempt += 1) {
+    try {
+      [injectionResult] = await chrome.scripting.executeScript({
+        target: { tabId },
+        world: "MAIN",
+        func,
+        args: [arg],
+      });
+      break;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (!isTransientFrameError(message) || attempt === 3) {
+        throw error;
+      }
+
+      await sleep(250 + attempt * 250);
+    }
+  }
 
   const result = injectionResult?.result;
   if (result?.ok) {
@@ -174,6 +187,19 @@ async function executeInstagramTask(tabId, func, arg) {
   }
 
   throw new Error(result?.error ?? "Instagram script did not return a result");
+}
+
+function isTransientFrameError(message) {
+  return (
+    message.includes("Frame with ID") ||
+    message.includes("frame was removed") ||
+    message.includes("Extension context invalidated") ||
+    message.includes("Cannot access contents of the page")
+  );
+}
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 async function fetchFollowingPageInInstagram(after) {
@@ -305,18 +331,25 @@ async function unfollowUserInInstagram(payload) {
       "x-asbd-id": "129477",
       "x-csrftoken": csrfToken,
       "x-ig-app-id": appId,
-      "x-instagram-ajax": rolloutHash,
       "x-requested-with": "XMLHttpRequest",
     };
+    if (rolloutHash !== "") {
+      headers["x-instagram-ajax"] = rolloutHash;
+    }
     const referer =
       typeof username === "string" && username !== ""
         ? `https://www.instagram.com/${username}/`
         : "https://www.instagram.com/";
+    const body = new URLSearchParams({
+      user_id: String(userId),
+      source: "profile",
+    }).toString();
 
     const response = await postUnfollow(
       `https://www.instagram.com/api/v1/friendships/destroy/${userId}/`,
       headers,
       referer,
+      body,
     );
 
     if (response.ok) {
@@ -327,11 +360,12 @@ async function unfollowUserInInstagram(payload) {
       `https://www.instagram.com/web/friendships/${userId}/unfollow/`,
       headers,
       referer,
+      body,
     );
 
     if (!fallbackResponse.ok) {
       throw new Error(
-        `Instagram unfollow request failed with ${response.status}/${fallbackResponse.status}`,
+        `Instagram unfollow request failed: ${await describeResponse(response)} / ${await describeResponse(fallbackResponse)}`,
       );
     }
 
@@ -343,13 +377,13 @@ async function unfollowUserInInstagram(payload) {
     };
   }
 
-  async function postUnfollow(url, headers, referrer) {
+  async function postUnfollow(url, headers, referrer, body) {
     const response = await fetch(url, {
       method: "POST",
       credentials: "include",
       headers,
       referrer,
-      body: "",
+      body,
     });
 
     if (!response.ok) {
@@ -378,5 +412,20 @@ async function unfollowUserInInstagram(payload) {
     } catch {
       return response;
     }
+  }
+
+  async function describeResponse(response) {
+    let text = "";
+    try {
+      text = await response.clone().text();
+    } catch {
+      text = "";
+    }
+
+    if (text.length > 180) {
+      text = `${text.slice(0, 180)}...`;
+    }
+
+    return `${response.status}${text === "" ? "" : ` ${text}`}`;
   }
 }

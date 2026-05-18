@@ -15,4 +15,4 @@ npm run dev
 ```
 `npm run build` builds the extension to `out/`.
 
-built with next.js 16, react 19, tailwind v4, framer-motion, base ui.
+built with svelte, vite, and tailwind v4.
