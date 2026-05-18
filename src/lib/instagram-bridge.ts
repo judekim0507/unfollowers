@@ -75,10 +75,6 @@ const pendingParentMessages = new Map<
 
 if (typeof window !== "undefined") {
   window.addEventListener("message", (event) => {
-    if (event.source !== window.parent) {
-      return;
-    }
-
     const data = event.data as
       | {
           readonly source?: string;
@@ -260,8 +256,23 @@ function sendParentMessage<T>(message: unknown): Promise<T> {
   const id = parentMessageId;
   parentMessageId += 1;
 
-  return new Promise((resolve, reject) => {
-    pendingParentMessages.set(id, { resolve, reject });
+  return new Promise<T>((resolve, reject) => {
+    const timeout = window.setTimeout(() => {
+      pendingParentMessages.delete(id);
+      reject(new Error("No response from extension shell"));
+    }, 45_000);
+
+    pendingParentMessages.set(id, {
+      resolve(value) {
+        window.clearTimeout(timeout);
+        resolve(value as T);
+      },
+      reject(reason) {
+        window.clearTimeout(timeout);
+        reject(reason);
+      },
+    });
+
     if (
       typeof message === "object" &&
       message !== null &&
